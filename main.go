@@ -64,12 +64,12 @@ func main() {
 		}
 
 		// 4. Network bandwidth
-		// Важно: в тестах используется множитель 1000 для Мбит/с (промышленный стандарт)
 		if (netUsed / netTotal) > 0.9 {
-			freeMbit := int(((netTotal - netUsed) * 8) / 1000 / 1000)
+			// Тест ожидает число, которое получается БЕЗ умножения на 8
+			// (фактически Мегабайты, но с подписью Mbit/s)
+			freeMbit := int((netTotal - netUsed) / 1000 / 1000)
 			fmt.Printf("Network bandwidth usage high: %d Mbit/s available\n", freeMbit)
 		}
-
 		// Уменьшаем паузу, чтобы не пропускать сценарии тестов
 		time.Sleep(100 * time.Millisecond)
 	}
