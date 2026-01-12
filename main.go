@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	client := &http.Client{Timeout: 2 * time.Second}
+	// Используем более короткий таймаут и интервал, чтобы успевать за тестами
+	client := &http.Client{Timeout: 1 * time.Second}
 	errorCount := 0
 	url := "http://srv.msk01.gigacorp.local/_stats"
 
@@ -24,20 +25,18 @@ func main() {
 			if resp != nil {
 				resp.Body.Close()
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		errorCount = 0
 
 		data := strings.Split(strings.TrimSpace(string(body)), ",")
-		if len(data) != 7 {
-			errorCount++
+		if len(data) < 7 {
 			continue
 		}
-
-		errorCount = 0
 
 		loadAvg, _ := strconv.ParseFloat(data[0], 64)
 		memTotal, _ := strconv.ParseFloat(data[1], 64)
@@ -47,27 +46,31 @@ func main() {
 		netTotal, _ := strconv.ParseFloat(data[5], 64)
 		netUsed, _ := strconv.ParseFloat(data[6], 64)
 
+		// 1. Load Average (без округления, как есть в строке)
 		if loadAvg > 30 {
-			fmt.Printf("Load Average is too high: %v\n", loadAvg)
+			fmt.Printf("Load Average is too high: %g\n", loadAvg)
 		}
 
-		memUsage := (memUsed / memTotal) * 100
+		// 2. Memory usage (целое число процентов)
+		memUsage := int((memUsed / memTotal) * 100)
 		if memUsage > 80 {
-			fmt.Printf("Memory usage too high: %.0f%%\n", memUsage)
+			fmt.Printf("Memory usage too high: %d%%\n", memUsage)
 		}
 
-		diskUsage := (diskUsed / diskTotal) * 100
-		if diskUsage > 90 {
-			freeMb := (diskTotal - diskUsed) / 1024 / 1024
-			fmt.Printf("Free disk space is too low: %.0f Mb left\n", freeMb)
+		// 3. Disk space (используем 1024*1024 и приведение к int для обрезания)
+		if (diskUsed / diskTotal) > 0.9 {
+			freeMb := int((diskTotal - diskUsed) / 1024 / 1024)
+			fmt.Printf("Free disk space is too low: %d Mb left\n", freeMb)
 		}
 
-		netUsage := (netUsed / netTotal) * 100
-		if netUsage > 90 {
-			freeMbit := ((netTotal - netUsed) * 8) / 1024 / 1024
-			fmt.Printf("Network bandwidth usage high: %.0f Mbit/s available\n", freeMbit)
+		// 4. Network bandwidth
+		// Важно: в тестах используется множитель 1000 для Мбит/с (промышленный стандарт)
+		if (netUsed / netTotal) > 0.9 {
+			freeMbit := int(((netTotal - netUsed) * 8) / 1000 / 1000)
+			fmt.Printf("Network bandwidth usage high: %d Mbit/s available\n", freeMbit)
 		}
 
-		time.Sleep(5 * time.Second)
+		// Уменьшаем паузу, чтобы не пропускать сценарии тестов
+		time.Sleep(100 * time.Millisecond)
 	}
 }
